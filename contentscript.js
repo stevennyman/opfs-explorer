@@ -139,6 +139,50 @@
     }
   };
 
+  const downloadDirectoryEntriesRecursiveWithoutZip = async (
+    directoryHandle,
+    relativePath = '.',
+    download = null
+  ) => {
+    // Get an iterator of the files and folders in the directory.
+    const directoryIterator = directoryHandle.values();
+    const directoryEntryPromises = [];
+    for await (const handle of directoryIterator) {
+      const nestedPath = `${relativePath}/${handle.name}`;
+      if (handle.kind === 'file') {
+        const fileHandle = getFileHandle(nestedPath).handle;
+        console.log(nestedPath.split("/").slice(-1)[0]);
+        try {
+          const handleDisk = await download.getFileHandle(handle.name, {create: true});
+          const fileData = await fileHandle.getFile();
+          // const dataToSave = request.data.isSAHPool
+          //   ? fileData.slice(HEADER_OFFSET_DATA)
+          //   : fileData;
+          const writable = await handleDisk.createWritable();
+          await writable.write(fileData);
+          await writable.close();
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.error(error.name, error.message);
+          }
+        }
+      } else if (handle.kind === 'directory') {
+        directoryEntryPromises.push(
+          (async () => {
+            return {
+              name: handle.name,
+              kind: handle.kind,
+              relativePath: nestedPath,
+              entries: await downloadDirectoryEntriesRecursiveWithoutZip(handle, nestedPath, (await download.getDirectoryHandle(handle.name, {create: true})))
+            };
+          })(),
+        );
+      }
+    }
+    await Promise.all(directoryEntryPromises);
+    return 'success';
+  };
+
   const getFileHandle = (path) => {
     return fileHandles.find((element) => {
       return element.nestedPath === path;
@@ -226,6 +270,17 @@
         const root = await navigator.storage.getDirectory();
         const blobUrl = await downloadDirectoryEntriesRecursive(root, '.', (new JSZip()));
         sendResponse({blobUrl: blobUrl}); 
+      } catch (error) {
+        console.error(error.name, error.message);
+        sendResponse({ error: error.message });
+      }
+    } else if (request.message === 'downloadAllWithoutZip') {
+      try {
+        const download = await showDirectoryPicker({mode: "readwrite", startIn: "downloads"});
+        console.log(download);
+        const root = await navigator.storage.getDirectory();
+        await downloadDirectoryEntriesRecursiveWithoutZip(root, '.', download);
+        sendResponse({result: "success"}); 
       } catch (error) {
         console.error(error.name, error.message);
         sendResponse({ error: error.message });

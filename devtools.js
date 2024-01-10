@@ -224,13 +224,13 @@
         const div = document.createElement('div');
         const downloadAllSpan = document.createElement('span');
         downloadAllSpan.classList.add('download-all');
-        downloadAllSpan.textContent = 'Download All as Zip';
-        downloadAllSpan.title = 'Download All as Zip';
+        downloadAllSpan.textContent = 'Download All';
+        downloadAllSpan.title = 'Download All';
         downloadAllSpan.addEventListener('click', (event) => {
           browser.tabs.sendMessage(
             browser.devtools.inspectedWindow.tabId,
             {
-              message: 'downloadAll'
+              message: 'downloadAllWithoutZip'
             },
             (response) => {
               if (response.error) {
